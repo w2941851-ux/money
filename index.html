@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>记账本</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --background: oklch(0.99 0.005 240);
+      --foreground: oklch(0.25 0.02 240);
+      --card: oklch(1 0 0);
+      --card-foreground: oklch(0.25 0.02 240);
+      --primary: oklch(0.62 0.18 240);
+      --primary-foreground: oklch(0.99 0.005 240);
+      --secondary: oklch(0.95 0.01 240);
+      --secondary-foreground: oklch(0.45 0.05 240);
+      --muted: oklch(0.96 0.005 240);
+      --muted-foreground: oklch(0.55 0.02 240);
+      --border: oklch(0.92 0.01 240);
+      --ring: oklch(0.62 0.18 240);
+    }
+    body {
+      background-color: var(--background);
+      color: var(--foreground);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+    @keyframes bubble {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.15); }
+      100% { transform: scale(1.1); }
+    }
+    .animate-bubble {
+      animation: bubble 0.3s ease-out forwards;
+    }
+    @keyframes ringGlow {
+      0% { stroke-dasharray: 0 500; opacity: 0; }
+      100% { opacity: 1; }
+    }
+    .activity-ring {
+      animation: ringGlow 1s ease-out forwards;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // 类目配置
+    const CATEGORY_GROUPS = [
+      {
+        id: "essential",
+        name: "必要支出",
+        color: "rgb(130, 200, 160)",
+        glowColor: "rgba(130, 200, 160, 0.3)",
+      },
+      {
+        id: "dining",
+        name: "饮食用餐",
+        color: "rgb(230, 200, 120)",
+        glowColor: "rgba(230, 200, 120, 0.3)",
+      },
+      {
+        id: "entertainment",
+        name: "生活娱乐",
+        color: "rgb(180, 160, 200)",
+        glowColor: "rgba(180, 160, 200, 0.3)",
+      },
+    ];
+
+    const EXPENSE_CATEGORIES = [
+      { name: "交通", icon: "🚗", group: "essential", keywords: ["车", "交通", "打车", "公交", "地铁", "出租车", "滴滴"] },
+      { name: "住房", icon: "🏠", group: "essential", keywords: ["房", "租", "房租", "水费", "电费", "物业费"] },
+      { name: "通讯", icon: "📱", group: "essential", keywords: ["话费", "流量", "手机费", "电话费", "套餐"] },
+      { name: "医疗", icon: "💊", group: "essential", keywords: ["医", "药", "看病", "挂号", "体检", "医院"] },
+      { name: "保险", icon: "🛡️", group: "essential", keywords: ["保险", "社保", "医保", "车险"] },
+      { name: "办公", icon: "💼", group: "essential", keywords: ["办公", "文具", "打印", "复印", "快递"] },
+      { name: "餐饮", icon: "🍜", group: "dining", keywords: ["吃", "餐", "饭", "早餐", "午餐", "晚餐", "外卖", "买菜", "排骨", "肉", "菜"] },
+      { name: "娱乐", icon: "🎮", group: "entertainment", keywords: ["玩", "娱乐", "电影", "游戏", "KTV"] },
+      { name: "购物", icon: "🛍️", group: "entertainment", keywords: ["买", "购", "淘宝", "京东", "商场", "超市"] },
+      { name: "服饰", icon: "👔", group: "entertainment", keywords: ["衣", "服", "裤", "裙", "鞋"] },
+      { name: "美容", icon: "💄", group: "entertainment", keywords: ["美容", "美发", "理发", "美甲", "护肤"] },
+      { name: "数码", icon: "💻", group: "entertainment", keywords: ["电脑", "手机", "平板", "耳机"] },
+      { name: "运动", icon: "⚽", group: "entertainment", keywords: ["运动", "健身", "跑步", "瑜伽", "游泳"] },
+      { name: "旅行", icon: "✈️", group: "entertainment", keywords: ["旅游", "旅行", "酒店", "住宿"] },
+      { name: "社交", icon: "👥", group: "entertainment", keywords: ["请客", "聚餐", "礼物", "红包"] },
+      { name: "宠物", icon: "🐾", group: "entertainment", keywords: ["宠物", "猫", "狗", "狗粮", "猫粮"] },
+      { name: "孩子", icon: "👶", group: "entertainment", keywords: ["孩子", "宝宝", "奶粉", "玩具"] },
+      { name: "学习", icon: "📚", group: "entertainment", keywords: ["学", "课", "培训", "教育", "书"] },
+      { name: "捐赠", icon: "❤️", group: "entertainment", keywords: ["捐", "捐款", "公益", "慈善"] },
+      { name: "其他", icon: "📦", group: "entertainment", keywords: ["其他", "杂费"] },
+    ];
+
+    function matchCategory(description) {
+      const lowerDesc = description.toLowerCase();
+      for (const category of EXPENSE_CATEGORIES) {
+        for (const keyword of category.keywords) {
+          if (lowerDesc.includes(keyword)) {
+            return category.name;
+          }
+        }
+      }
+      return null;
+    }
+
+    // 图标组件
+    const Wallet = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>;
+    const Calendar = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>;
+    const ChevronDown = ({ className }) => <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>;
+    const X = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>;
+    const Mic = () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>;
+    const MicOff = () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" /></svg>;
+
+    // Activity Rings 组件
+    function ActivityRings({ expenses }) {
+      const groupStats = {};
+      CATEGORY_GROUPS.forEach(group => {
+        groupStats[group.id] = 0;
+      });
+
+      expenses.forEach(expense => {
+        const category = EXPENSE_CATEGORIES.find(c => c.name === expense.category);
+        if (category) {
+          groupStats[category.group] += expense.amount;
+        }
+      });
+
+      const total = Object.values(groupStats).reduce((sum, val) => sum + val, 0);
+      const rings = [
+        { ...CATEGORY_GROUPS[1], amount: groupStats.dining, radius: 60 },
+        { ...CATEGORY_GROUPS[2], amount: groupStats.entertainment, radius: 75 },
+        { ...CATEGORY_GROUPS[0], amount: groupStats.essential, radius: 90 },
+      ];
+
+      return (
+        <div className="bg-white/30 backdrop-blur-md rounded-2xl p-6 border border-white/40 shadow-lg">
+          <h3 className="text-sm font-medium mb-4 text-white">支出分析</h3>
+          <div className="flex items-center justify-center mb-6">
+            <svg width="220" height="220" viewBox="0 0 220 220">
+              {rings.map((ring, index) => {
+                const circumference = 2 * Math.PI * ring.radius;
+                const percentage = total > 0 ? (ring.amount / total) * 100 : 0;
+                const strokeDasharray = `${(percentage / 100) * circumference} ${circumference}`;
+                return (
+                  <circle
+                    key={ring.id}
+                    cx="110"
+                    cy="110"
+                    r={ring.radius}
+                    fill="none"
+                    stroke={ring.color}
+                    strokeWidth="12"
+                    strokeDasharray={strokeDasharray}
+                    strokeLinecap="round"
+                    transform="rotate(-90 110 110)"
+                    className="activity-ring"
+                    style={{
+                      filter: `drop-shadow(0 0 8px ${ring.glowColor})`,
+                    }}
+                  />
+                );
+              })}
+            </svg>
+          </div>
+          <div className="space-y-3">
+            {rings.map(ring => (
+              <div key={ring.id} className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{
+                      backgroundColor: ring.color,
+                      boxShadow: `0 0 8px ${ring.glowColor}`,
+                    }}
+                  />
+                  <span className="text-sm text-white/90">{ring.name}</span>
+                </div>
+                <span className="text-sm font-medium text-white">¥{ring.amount.toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // 语音输入组件
+    function VoiceInput({ onSubmit, onCancel }) {
+      const [isListening, setIsListening] = useState(false);
+      const [transcript, setTranscript] = useState("");
+      const [parsedExpenses, setParsedExpenses] = useState([]);
+      const recognitionRef = useRef(null);
+
+      useEffect(() => {
+        if (typeof window !== "undefined" && ("webkitSpeechRecognition" in window || "SpeechRecognition" in window)) {
+          const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
+          recognitionRef.current = new SpeechRecognition();
+          recognitionRef.current.continuous = true;
+          recognitionRef.current.interimResults = true;
+          recognitionRef.current.lang = "zh-CN";
+
+          recognitionRef.current.onresult = (event) => {
+            let finalTranscript = "";
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+              if (event.results[i].isFinal) {
+                finalTranscript += event.results[i][0].transcript;
+              }
+            }
+            if (finalTranscript) {
+              setTranscript((prev) => prev + finalTranscript);
+            }
+          };
+        }
+      }, []);
+
+      useEffect(() => {
+        if (transcript) {
+          parseTranscript(transcript);
+        }
+      }, [transcript]);
+
+      const parseTranscript = (text) => {
+        let normalizedText = text
+          .replace(/还有|然后|接着|另外/g, "|")
+          .replace(/[，,。；;、]/g, "|");
+
+        const segments = normalizedText.split("|").filter(s => s.trim());
+        const expenses = [];
+
+        segments.forEach(segment => {
+          const patterns = [
+            /([^\d]+?)\s*(\d+(?:\.\d+)?)\s*(?:元|块|块钱|圆|rmb)?/i,
+            /(\d+(?:\.\d+)?)\s*(?:元|块|块钱|圆|rmb)?\s*([^\d]+)/i,
+            /([^\d]+?)\s*(\d+(?:\.\d+)?)/i,
+          ];
+
+          for (const pattern of patterns) {
+            const match = segment.match(pattern);
+            if (match) {
+              let description, amount;
+              if (/\d/.test(match[1])) {
+                amount = parseFloat(match[1]);
+                description = match[2];
+              } else {
+                description = match[1];
+                amount = parseFloat(match[2]);
+              }
+
+              if (amount && description && description.trim()) {
+                const category = matchCategory(description) || "其他";
+                expenses.push({ amount, description: description.trim(), category });
+                break;
+              }
+            }
+          }
+        });
+
+        setParsedExpenses(expenses);
+      };
+
+      const startListening = () => {
+        if (recognitionRef.current) {
+          setTranscript("");
+          setParsedExpenses([]);
+          recognitionRef.current.start();
+          setIsListening(true);
+        }
+      };
+
+      const stopListening = () => {
+        if (recognitionRef.current) {
+          recognitionRef.current.stop();
+          setIsListening(false);
+        }
+      };
+
+      const handleSubmit = () => {
+        if (parsedExpenses.length > 0) {
+          onSubmit(parsedExpenses);
+        }
+      };
+
+      return (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-semibold">一口气说完</h2>
+            <button onClick={onCancel} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+              <X />
+            </button>
+          </div>
+
+          <div className="flex flex-col items-center gap-6 mb-6">
+            <button
+              onClick={isListening ? stopListening : startListening}
+              className={`w-24 h-24 rounded-full flex items-center justify-center transition-all ${
+                isListening
+                  ? "bg-red-500 text-white animate-pulse"
+                  : "bg-blue-500 text-white hover:bg-blue-600"
+              }`}
+            >
+              {isListening ? <MicOff /> : <Mic />}
+            </button>
+            <p className="text-sm text-gray-600 text-center">
+              {isListening ? "正在录音..." : "点击麦克风开始说话"}
+            </p>
+          </div>
+
+          {transcript && (
+            <div className="mb-4 p-4 bg-gray-50 rounded-xl">
+              <p className="text-sm text-gray-600 mb-1">识别内容：</p>
+              <p className="text-sm">{transcript}</p>
+            </div>
+          )}
+
+          {parsedExpenses.length > 0 && (
+            <div className="space-y-3 mb-6">
+              <p className="text-sm font-medium text-gray-700">识别到的支出：</p>
+              {parsedExpenses.map((expense, index) => {
+                const category = EXPENSE_CATEGORIES.find(c => c.name === expense.category);
+                return (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-xl"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{category?.icon || "📦"}</span>
+                      <div>
+                        <p className="text-sm font-medium">{expense.description}</p>
+                        <p className="text-xs text-gray-500">{expense.category}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium">¥{expense.amount}</span>
+                      <button
+                        onClick={() => setParsedExpenses(parsedExpenses.filter((_, i) => i !== index))}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <X />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {parsedExpenses.length > 0 && (
+            <button
+              onClick={handleSubmit}
+              className="w-full py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition-colors"
+            >
+              确认记录
+            </button>
+          )}
+        </div>
+      );
+    }
+
+    // 主应用
+    function ExpenseTracker() {
+      const [expenses, setExpenses] = useState(() => {
+        const saved = localStorage.getItem("expense-tracker-data");
+        return saved ? JSON.parse(saved) : [];
+      });
+      const [showForm, setShowForm] = useState(false);
+      const [showVoiceInput, setShowVoiceInput] = useState(false);
+      const [showRings, setShowRings] = useState(false);
+      const [showAddMenu, setShowAddMenu] = useState(false);
+      const [formData, setFormData] = useState({
+        amount: "",
+        description: "",
+        category: "",
+      });
+
+      useEffect(() => {
+        localStorage.setItem("expense-tracker-data", JSON.stringify(expenses));
+      }, [expenses]);
+
+      const addExpense = (e) => {
+        e.preventDefault();
+        const category = EXPENSE_CATEGORIES.find(c => c.name === formData.category) || EXPENSE_CATEGORIES[EXPENSE_CATEGORIES.length - 1];
+        const newExpense = {
+          id: Date.now().toString(),
+          amount: parseFloat(formData.amount),
+          category: formData.category,
+          description: formData.description,
+          date: new Date().toISOString(),
+          icon: category.icon,
+        };
+        setExpenses([newExpense, ...expenses]);
+        setFormData({ amount: "", description: "", category: "" });
+        setShowForm(false);
+      };
+
+      const addBatchExpenses = (batchExpenses) => {
+        const newExpenses = batchExpenses.map((expense, index) => {
+          const categoryData = EXPENSE_CATEGORIES.find(c => c.name === expense.category) || EXPENSE_CATEGORIES[EXPENSE_CATEGORIES.length - 1];
+          return {
+            id: (Date.now() + index).toString(),
+            amount: expense.amount,
+            category: expense.category,
+            description: expense.description,
+            date: new Date().toISOString(),
+            icon: categoryData.icon,
+          };
+        });
+        setExpenses([...newExpenses, ...expenses]);
+        setShowVoiceInput(false);
+      };
+
+      const deleteExpense = (id) => {
+        setExpenses(expenses.filter(e => e.id !== id));
+      };
+
+      const totalExpense = expenses.reduce((sum, e) => sum + e.amount, 0);
+
+      const groupStats = {};
+      CATEGORY_GROUPS.forEach(group => {
+        groupStats[group.id] = 0;
+      });
+      expenses.forEach(expense => {
+        const category = EXPENSE_CATEGORIES.find(c => c.name === expense.category);
+        if (category) {
+          groupStats[category.group] += expense.amount;
+        }
+      });
+
+      useEffect(() => {
+        if (formData.description) {
+          const matched = matchCategory(formData.description);
+          if (matched && !formData.category) {
+            setFormData(prev => ({ ...prev, category: matched }));
+          }
+        }
+      }, [formData.description]);
+
+      return (
+        <div className="mx-auto max-w-md min-h-screen flex flex-col" style={{ backgroundColor: "var(--background)" }}>
+          {/* Header */}
+          <div style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }} className="px-6 py-8 rounded-b-[2rem]">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                  <Wallet />
+                </div>
+                <h1 className="text-xl font-semibold">记账本</h1>
+              </div>
+              <button
+                onClick={() => setShowRings(!showRings)}
+                className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm hover:bg-white/20 transition-colors"
+              >
+                <Calendar />
+              </button>
+            </div>
+
+            {showRings && (
+              <div className="mb-6">
+                <ActivityRings expenses={expenses} />
+              </div>
+            )}
+
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-sm text-white/80">本月支出</span>
+                <span className="text-xs text-white/60">{expenses.length} 笔</span>
+              </div>
+              <div className="text-3xl font-bold mb-4">¥{totalExpense.toFixed(2)}</div>
+              <div className="space-y-2">
+                {CATEGORY_GROUPS.map(group => (
+                  <div key={group.id} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-2 h-2 rounded-full"
+                        style={{
+                          backgroundColor: group.color,
+                          boxShadow: `0 0 6px ${group.glowColor}`,
+                        }}
+                      />
+                      <span className="text-xs text-white/80">{group.name}</span>
+                    </div>
+                    <span className="text-xs font-medium text-white/90">¥{groupStats[group.id].toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 px-6 py-6">
+            {showForm ? (
+              <div className="bg-white rounded-2xl shadow-sm border p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-lg font-semibold">添加支出</h2>
+                  <button onClick={() => setShowForm(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+                    <X />
+                  </button>
+                </div>
+                <form onSubmit={addExpense} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">金额</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formData.amount}
+                      onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                      className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="0.00"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">描述</label>
+                    <input
+                      type="text"
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="例如：买菜、打车"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">类目</label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {EXPENSE_CATEGORIES.map(category => (
+                        <button
+                          key={category.name}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, category: category.name })}
+                          className={`p-3 rounded-xl border-2 transition-all ${
+                            formData.category === category.name
+                              ? "border-blue-500 bg-blue-50 animate-bubble"
+                              : "border-gray-200 hover:border-blue-300 hover:scale-105"
+                          }`}
+                        >
+                          <div className="text-2xl mb-1">{category.icon}</div>
+                          <div className="text-xs">{category.name}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600"
+                  >
+                    添加
+                  </button>
+                </form>
+              </div>
+            ) : showVoiceInput ? (
+              <VoiceInput onSubmit={addBatchExpenses} onCancel={() => setShowVoiceInput(false)} />
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-lg font-semibold">支出记录</h2>
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowAddMenu(!showAddMenu)}
+                      style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium hover:opacity-90"
+                    >
+                      + 记一笔
+                      <ChevronDown className={`w-4 h-4 transition-transform ${showAddMenu ? "rotate-180" : ""}`} />
+                    </button>
+                    {showAddMenu && (
+                      <div className="absolute right-0 top-full mt-2 w-40 bg-white rounded-xl shadow-lg border overflow-hidden z-10">
+                        <button
+                          onClick={() => { setShowForm(true); setShowAddMenu(false); }}
+                          className="w-full px-4 py-3 text-left text-sm hover:bg-gray-100"
+                        >
+                          手动输入
+                        </button>
+                        <button
+                          onClick={() => { setShowVoiceInput(true); setShowAddMenu(false); }}
+                          className="w-full px-4 py-3 text-left text-sm hover:bg-gray-100 border-t"
+                        >
+                          一口气说完
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {expenses.length === 0 ? (
+                  <div className="text-center py-16">
+                    <div className="w-20 h-20 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                      <Wallet />
+                    </div>
+                    <p className="text-gray-500 text-sm">还没有支出记录</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {expenses.map(expense => (
+                      <div key={expense.id} className="bg-white rounded-xl p-4 shadow-sm border flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">{expense.icon}</span>
+                          <div>
+                            <p className="font-medium">{expense.description}</p>
+                            <p className="text-xs text-gray-500">{expense.category}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="font-medium">¥{expense.amount.toFixed(2)}</span>
+                          <button
+                            onClick={() => deleteExpense(expense.id)}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <X />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.render(<ExpenseTracker />, document.getElementById('root'));
+  </script>
+</body>
+</html>
