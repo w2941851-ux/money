@@ -2,58 +2,63 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>记账本</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     :root {
-      --primary: #6366f1;
-      --primary-foreground: #ffffff;
-      --secondary: #f1f5f9;
-      --card: #ffffff;
-      --card-foreground: #1e293b;
-      --muted-foreground: #64748b;
-      --border: #e2e8f0;
+      --background: oklch(0.99 0.005 240);
+      --foreground: oklch(0.25 0.02 240);
+      --card: oklch(1 0 0);
+      --card-foreground: oklch(0.25 0.02 240);
+      --primary: oklch(0.62 0.18 240);
+      --primary-foreground: oklch(0.99 0.005 240);
+      --secondary: oklch(0.95 0.01 240);
+      --secondary-foreground: oklch(0.45 0.05 240);
+      --muted: oklch(0.96 0.005 240);
+      --muted-foreground: oklch(0.55 0.02 240);
+      --border: oklch(0.92 0.01 240);
+      --ring: oklch(0.62 0.18 240);
     }
-    
+    body {
+      background-color: var(--background);
+      color: var(--foreground);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
     @keyframes bubble {
       0% { transform: scale(1); }
       50% { transform: scale(1.15); }
       100% { transform: scale(1.1); }
     }
-    
     .animate-bubble {
       animation: bubble 0.3s ease-out forwards;
     }
-    
     @keyframes ringGlow {
       0% { stroke-dasharray: 0 500; opacity: 0; }
       100% { opacity: 1; }
     }
-    
     .activity-ring {
       animation: ringGlow 1s ease-out forwards;
     }
-    
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
-    
-    .animate-pulse {
-      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-    }
   </style>
 </head>
-<body class="bg-slate-50">
-  <div id="app"></div>
+<body>
+  <div id="root"></div>
 
-  <script type="module">
-    // ======= 类目配置 =======
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // 类目配置
     const CATEGORY_GROUPS = [
       {
         id: "essential",
-        name: "必要开支",
+        name: "必要支出",
         color: "rgb(130, 200, 160)",
         glowColor: "rgba(130, 200, 160, 0.3)",
       },
@@ -72,26 +77,26 @@
     ];
 
     const EXPENSE_CATEGORIES = [
-      { name: "交通", icon: "🚗", group: "essential", keywords: ["车","交通","打车","公交","地铁","出租车","滴滴","高铁","火车","飞机","机票","加油","停车","过路费","共享单车","uber","油费","车费","票"] },
-      { name: "住房", icon: "🏠", group: "essential", keywords: ["房","租","房租","水费","电费","燃气费","物业费","网费","宽带","装修","家居","维修","清洁"] },
-      { name: "通讯", icon: "📱", group: "essential", keywords: ["话费","流量","手机费","电话费","套餐","充值","宽带","上网","通信"] },
-      { name: "医疗", icon: "💊", group: "essential", keywords: ["医","药","看病","挂号","体检","医院","诊所","治疗","药店","保健","口腔","牙医","眼镜","按摩","理疗"] },
-      { name: "保险", icon: "🛡️", group: "essential", keywords: ["保险","社保","医保","车险","意外险","寿险","重疾险","财产险","保费"] },
-      { name: "办公", icon: "💼", group: "essential", keywords: ["办公","文具","打印","复印","快递","邮费","会议","出差","商务","笔","本子","文件夹","订书机"] },
-      { name: "餐饮", icon: "🍜", group: "dining", keywords: ["吃","餐","饭","早餐","午餐","晚餐","夜宵","零食","饮料","咖啡","奶茶","火锅","烧烤","外卖","食堂","美食","小吃","快餐","自助餐","点心","甜品","蛋糕","面包","水果","肉","鱼","虾","蟹","鸡","鸭","猪","牛","羊","排骨","五花肉","牛排","鸡腿","鸡翅","海鲜","蔬菜","青菜","面","粉","米","米饭","面条","粉条","拉面","饺子","包子","馒头","寿司","披萨","汉堡","炸鸡","麻辣烫","冒菜","串串","炒菜","炖","煮","煎","炒","蒸","炖汤","粥","茶","酒","啤酒","白酒","红酒","果汁","可乐","雪碧","豆浆","牛奶","酸奶","买菜"] },
-      { name: "娱乐", icon: "🎮", group: "entertainment", keywords: ["玩","娱乐","电影","游戏","KTV","唱歌","酒吧","聚会","门票","会员","充值"] },
-      { name: "购物", icon: "🛍️", group: "entertainment", keywords: ["买","购","淘宝","京东","拼多多","商场","超市","网购","衣服","鞋","包","化妆品","护肤","手机","电脑","数码","电器","家具","日用品","生活用品"] },
-      { name: "服饰", icon: "👔", group: "entertainment", keywords: ["衣","服","裤","裙","外套","T恤","卫衣","羽绒服","西装","鞋子","运动鞋","皮鞋","凉鞋","拖鞋","袜子","帽子","围巾","手套"] },
-      { name: "美容", icon: "💄", group: "entertainment", keywords: ["美容","美发","理发","染发","烫发","造型","美甲","护肤","面膜","精华","防晒","洗面奶","水乳","化妆","口红","粉底","眼影","spa"] },
-      { name: "数码", icon: "💻", group: "entertainment", keywords: ["电脑","手机","平板","ipad","耳机","音响","键盘","鼠标","显示器","相机","镜头","充电器","数据线","硬盘","u盘"] },
-      { name: "运动", icon: "⚽", group: "entertainment", keywords: ["运动","健身","跑步","瑜伽","游泳","球","羽毛球","篮球","足球","乒乓球","网球","装备","运动服","球鞋","健身卡"] },
-      { name: "旅行", icon: "✈️", group: "entertainment", keywords: ["旅游","旅行","酒店","住宿","民宿","机票","车票","景点","门票","导游","签证","保险","行李","背包"] },
-      { name: "社交", icon: "👥", group: "entertainment", keywords: ["请客","聚餐","礼物","红包","份子钱","聚会","送礼","请人","人情","宴请","生日","结婚","满月"] },
-      { name: "宠物", icon: "🐾", group: "entertainment", keywords: ["宠物","猫","狗","狗粮","猫粮","宠物医院","宠物店","洗澡","美容","玩具","零食","用品"] },
-      { name: "孩子", icon: "👶", group: "entertainment", keywords: ["孩子","宝宝","婴儿","奶粉","尿布","纸尿裤","玩具","童装","童鞋","早教","幼儿园","学费","兴趣班","奶瓶","推车"] },
-      { name: "学习", icon: "📚", group: "entertainment", keywords: ["学","课","培训","教育","书","课程","学费","培训费","补习","网课","证书","考试","教材","文具","笔记本"] },
-      { name: "捐赠", icon: "❤️", group: "entertainment", keywords: ["捐","捐款","捐赠","公益","慈善","爱心","募捐","义卖","救助"] },
-      { name: "其他", icon: "📦", group: "entertainment", keywords: ["其他","杂费","零散"] },
+      { name: "交通", icon: "🚗", group: "essential", keywords: ["车", "交通", "打车", "公交", "地铁", "出租车", "滴滴"] },
+      { name: "住房", icon: "🏠", group: "essential", keywords: ["房", "租", "房租", "水费", "电费", "物业费"] },
+      { name: "通讯", icon: "📱", group: "essential", keywords: ["话费", "流量", "手机费", "电话费", "套餐"] },
+      { name: "医疗", icon: "💊", group: "essential", keywords: ["医", "药", "看病", "挂号", "体检", "医院"] },
+      { name: "保险", icon: "🛡️", group: "essential", keywords: ["保险", "社保", "医保", "车险"] },
+      { name: "办公", icon: "💼", group: "essential", keywords: ["办公", "文具", "打印", "复印", "快递"] },
+      { name: "餐饮", icon: "🍜", group: "dining", keywords: ["吃", "餐", "饭", "早餐", "午餐", "晚餐", "外卖", "买菜", "排骨", "肉", "菜"] },
+      { name: "娱乐", icon: "🎮", group: "entertainment", keywords: ["玩", "娱乐", "电影", "游戏", "KTV"] },
+      { name: "购物", icon: "🛍️", group: "entertainment", keywords: ["买", "购", "淘宝", "京东", "商场", "超市"] },
+      { name: "服饰", icon: "👔", group: "entertainment", keywords: ["衣", "服", "裤", "裙", "鞋"] },
+      { name: "美容", icon: "💄", group: "entertainment", keywords: ["美容", "美发", "理发", "美甲", "护肤"] },
+      { name: "数码", icon: "💻", group: "entertainment", keywords: ["电脑", "手机", "平板", "耳机"] },
+      { name: "运动", icon: "⚽", group: "entertainment", keywords: ["运动", "健身", "跑步", "瑜伽", "游泳"] },
+      { name: "旅行", icon: "✈️", group: "entertainment", keywords: ["旅游", "旅行", "酒店", "住宿"] },
+      { name: "社交", icon: "👥", group: "entertainment", keywords: ["请客", "聚餐", "礼物", "红包"] },
+      { name: "宠物", icon: "🐾", group: "entertainment", keywords: ["宠物", "猫", "狗", "狗粮", "猫粮"] },
+      { name: "孩子", icon: "👶", group: "entertainment", keywords: ["孩子", "宝宝", "奶粉", "玩具"] },
+      { name: "学习", icon: "📚", group: "entertainment", keywords: ["学", "课", "培训", "教育", "书"] },
+      { name: "捐赠", icon: "❤️", group: "entertainment", keywords: ["捐", "捐款", "公益", "慈善"] },
+      { name: "其他", icon: "📦", group: "entertainment", keywords: ["其他", "杂费"] },
     ];
 
     function matchCategory(description) {
@@ -106,643 +111,522 @@
       return null;
     }
 
-    function getCategoryGroup(categoryName) {
-      const category = EXPENSE_CATEGORIES.find(c => c.name === categoryName);
-      const group = category?.group || "essential";
-      return CATEGORY_GROUPS.find(g => g.id === group) || CATEGORY_GROUPS[0];
+    // 图标组件
+    const Wallet = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>;
+    const Calendar = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>;
+    const ChevronDown = ({ className }) => <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>;
+    const X = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>;
+    const Mic = () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>;
+    const MicOff = () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" /></svg>;
+
+    // Activity Rings 组件
+    function ActivityRings({ expenses }) {
+      const groupStats = {};
+      CATEGORY_GROUPS.forEach(group => {
+        groupStats[group.id] = 0;
+      });
+
+      expenses.forEach(expense => {
+        const category = EXPENSE_CATEGORIES.find(c => c.name === expense.category);
+        if (category) {
+          groupStats[category.group] += expense.amount;
+        }
+      });
+
+      const total = Object.values(groupStats).reduce((sum, val) => sum + val, 0);
+      const rings = [
+        { ...CATEGORY_GROUPS[1], amount: groupStats.dining, radius: 60 },
+        { ...CATEGORY_GROUPS[2], amount: groupStats.entertainment, radius: 75 },
+        { ...CATEGORY_GROUPS[0], amount: groupStats.essential, radius: 90 },
+      ];
+
+      return (
+        <div className="bg-white/30 backdrop-blur-md rounded-2xl p-6 border border-white/40 shadow-lg">
+          <h3 className="text-sm font-medium mb-4 text-white">支出分析</h3>
+          <div className="flex items-center justify-center mb-6">
+            <svg width="220" height="220" viewBox="0 0 220 220">
+              {rings.map((ring, index) => {
+                const circumference = 2 * Math.PI * ring.radius;
+                const percentage = total > 0 ? (ring.amount / total) * 100 : 0;
+                const strokeDasharray = `${(percentage / 100) * circumference} ${circumference}`;
+                return (
+                  <circle
+                    key={ring.id}
+                    cx="110"
+                    cy="110"
+                    r={ring.radius}
+                    fill="none"
+                    stroke={ring.color}
+                    strokeWidth="12"
+                    strokeDasharray={strokeDasharray}
+                    strokeLinecap="round"
+                    transform="rotate(-90 110 110)"
+                    className="activity-ring"
+                    style={{
+                      filter: `drop-shadow(0 0 8px ${ring.glowColor})`,
+                    }}
+                  />
+                );
+              })}
+            </svg>
+          </div>
+          <div className="space-y-3">
+            {rings.map(ring => (
+              <div key={ring.id} className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{
+                      backgroundColor: ring.color,
+                      boxShadow: `0 0 8px ${ring.glowColor}`,
+                    }}
+                  />
+                  <span className="text-sm text-white/90">{ring.name}</span>
+                </div>
+                <span className="text-sm font-medium text-white">¥{ring.amount.toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
     }
 
-    // ======= 应用状态 =======
-    const STORAGE_KEY = "expense-tracker-data";
-    let state = {
-      expenses: JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'),
-      view: 'list', // 'list', 'form', 'voice'
-      showRings: false,
-      showAddMenu: false,
-      formData: { amount: '', description: '', category: '' },
-      voiceData: { isListening: false, transcript: '', parsedExpenses: [] },
-      swipeState: { swipedId: null, startX: 0, currentX: 0, isDragging: false }
-    };
+    // 语音输入组件
+    function VoiceInput({ onSubmit, onCancel }) {
+      const [isListening, setIsListening] = useState(false);
+      const [transcript, setTranscript] = useState("");
+      const [parsedExpenses, setParsedExpenses] = useState([]);
+      const recognitionRef = useRef(null);
 
-    let recognition = null;
+      useEffect(() => {
+        if (typeof window !== "undefined" && ("webkitSpeechRecognition" in window || "SpeechRecognition" in window)) {
+          const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
+          recognitionRef.current = new SpeechRecognition();
+          recognitionRef.current.continuous = true;
+          recognitionRef.current.interimResults = true;
+          recognitionRef.current.lang = "zh-CN";
 
-    // ======= 初始化语音识别 =======
-    function initSpeechRecognition() {
-      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-        const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
-        recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = 'zh-CN';
+          recognitionRef.current.onresult = (event) => {
+            let finalTranscript = "";
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+              if (event.results[i].isFinal) {
+                finalTranscript += event.results[i][0].transcript;
+              }
+            }
+            if (finalTranscript) {
+              setTranscript((prev) => prev + finalTranscript);
+            }
+          };
+        }
+      }, []);
 
-        recognition.onresult = (event) => {
-          let finalTranscript = '';
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            if (event.results[i].isFinal) {
-              finalTranscript += event.results[i][0].transcript;
+      useEffect(() => {
+        if (transcript) {
+          parseTranscript(transcript);
+        }
+      }, [transcript]);
+
+      const parseTranscript = (text) => {
+        let normalizedText = text
+          .replace(/还有|然后|接着|另外/g, "|")
+          .replace(/[，,。；;、]/g, "|");
+
+        const segments = normalizedText.split("|").filter(s => s.trim());
+        const expenses = [];
+
+        segments.forEach(segment => {
+          const patterns = [
+            /([^\d]+?)\s*(\d+(?:\.\d+)?)\s*(?:元|块|块钱|圆|rmb)?/i,
+            /(\d+(?:\.\d+)?)\s*(?:元|块|块钱|圆|rmb)?\s*([^\d]+)/i,
+            /([^\d]+?)\s*(\d+(?:\.\d+)?)/i,
+          ];
+
+          for (const pattern of patterns) {
+            const match = segment.match(pattern);
+            if (match) {
+              let description, amount;
+              if (/\d/.test(match[1])) {
+                amount = parseFloat(match[1]);
+                description = match[2];
+              } else {
+                description = match[1];
+                amount = parseFloat(match[2]);
+              }
+
+              if (amount && description && description.trim()) {
+                const category = matchCategory(description) || "其他";
+                expenses.push({ amount, description: description.trim(), category });
+                break;
+              }
             }
           }
-          state.voiceData.transcript += finalTranscript;
-          render();
-        };
-
-        recognition.onerror = (event) => {
-          console.error('语音识别错误:', event.error);
-          state.voiceData.isListening = false;
-          render();
-        };
-
-        recognition.onend = () => {
-          state.voiceData.isListening = false;
-          render();
-        };
-      }
-    }
-
-    // ======= 核心函数 =======
-    function saveExpenses() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.expenses));
-    }
-
-    function addExpense(expense) {
-      state.expenses.unshift({ ...expense, id: Date.now().toString() });
-      saveExpenses();
-      state.view = 'list';
-      render();
-    }
-
-    function addBatchExpenses(batchExpenses) {
-      const newExpenses = batchExpenses.map((expense, index) => {
-        const categoryData = EXPENSE_CATEGORIES.find(c => c.name === expense.category) || EXPENSE_CATEGORIES[EXPENSE_CATEGORIES.length - 1];
-        return {
-          id: (Date.now() + index).toString(),
-          amount: expense.amount,
-          category: expense.category,
-          description: expense.description,
-          date: new Date().toISOString(),
-          icon: categoryData.icon,
-        };
-      });
-      state.expenses = [...newExpenses, ...state.expenses];
-      saveExpenses();
-      state.view = 'list';
-      render();
-    }
-
-    function deleteExpense(id) {
-      state.expenses = state.expenses.filter(e => e.id !== id);
-      saveExpenses();
-      render();
-    }
-
-    function toggleListening() {
-      if (!recognition) {
-        alert('您的浏览器不支持语音识别功能');
-        return;
-      }
-
-      if (state.voiceData.isListening) {
-        recognition.stop();
-        parseTranscript(state.voiceData.transcript);
-      } else {
-        state.voiceData.transcript = '';
-        state.voiceData.parsedExpenses = [];
-        recognition.start();
-        state.voiceData.isListening = true;
-      }
-      render();
-    }
-
-    function parseTranscript(text) {
-      const expenses = [];
-      const normalizedText = text.replace(/还有|然后|接着|另外/g, '|').replace(/[，,。；;、]/g, '|');
-      const segments = normalizedText.split('|').map(s => s.trim()).filter(s => s.length > 0);
-
-      for (const segment of segments) {
-        const cleanSegment = segment.replace(/\s+/g, '');
-        if (!cleanSegment) continue;
-
-        let matched = false;
-        let description = '';
-        let amount = 0;
-
-        const pattern1 = /^([^\d]+?)(\d+(?:\.\d+)?)(元|块|块钱|圆)?$/;
-        const match1 = cleanSegment.match(pattern1);
-        if (match1) {
-          description = match1[1];
-          amount = parseFloat(match1[2]);
-          matched = true;
-        }
-
-        if (!matched) {
-          const pattern2 = /^(\d+(?:\.\d+)?)(元|块|块钱|圆)?([^\d]+?)$/;
-          const match2 = cleanSegment.match(pattern2);
-          if (match2) {
-            amount = parseFloat(match2[1]);
-            description = match2[3];
-            matched = true;
-          }
-        }
-
-        if (!matched) {
-          const pattern3 = /([^\d]*?)(\d+(?:\.\d+)?)(元|块|块钱|圆)?([^\d]*)/;
-          const match3 = cleanSegment.match(pattern3);
-          if (match3) {
-            const beforeNum = match3[1] || '';
-            const afterNum = match3[4] || '';
-            description = (beforeNum + afterNum).replace(/买了|买|花了|花|了/g, '').trim();
-            amount = parseFloat(match3[2]);
-            if (description) matched = true;
-          }
-        }
-
-        if (matched && !isNaN(amount) && amount > 0 && description) {
-          description = description.replace(/买了|买|花了|花|用了|用|的|一个|一份|了/g, '').trim();
-          if (description) {
-            const category = matchCategory(description) || '其他';
-            expenses.push({ amount, description, category });
-          }
-        }
-      }
-
-      state.voiceData.parsedExpenses = expenses;
-      render();
-    }
-
-    // ======= 渲染函数 =======
-    function render() {
-      const app = document.getElementById('app');
-      const totalExpense = state.expenses.reduce((sum, e) => sum + e.amount, 0);
-      const currentMonth = new Date().toLocaleDateString('zh-CN', { month: 'long' });
-
-      // 计算分类统计
-      const categoryStats = CATEGORY_GROUPS.map(group => {
-        const groupExpenses = state.expenses.filter(expense => {
-          const expenseGroup = getCategoryGroup(expense.category);
-          return expenseGroup.id === group.id;
         });
-        const total = groupExpenses.reduce((sum, expense) => sum + expense.amount, 0);
-        const percentage = totalExpense > 0 ? (total / totalExpense) * 100 : 0;
-        return { ...group, total, percentage };
-      });
 
-      app.innerHTML = `
-        <div class="mx-auto max-w-md min-h-screen flex flex-col bg-slate-50">
-          <!-- Header -->
-          <div class="bg-indigo-500 text-white px-6 py-8 rounded-b-[2rem]">
-            <div class="flex items-center justify-between mb-8">
-              <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
-                  </svg>
-                </div>
-                <h1 class="text-xl font-semibold">记账本</h1>
-              </div>
-              <button onclick="toggleRings()" class="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm hover:bg-white/20 transition-colors">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                </svg>
-              </button>
-            </div>
-
-            ${state.showRings ? renderActivityRings(categoryStats, currentMonth) : ''}
-
-            <!-- Summary -->
-            <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-5">
-              <div class="flex items-center justify-between mb-3">
-                <span class="text-white/70 text-sm">本月支出</span>
-                <div class="flex items-center gap-1.5 text-white/70 text-xs">
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"/>
-                  </svg>
-                  <span>${currentMonth}</span>
-                </div>
-              </div>
-              <div class="flex items-baseline gap-2">
-                <span class="text-3xl font-bold text-white">¥${totalExpense.toFixed(2)}</span>
-              </div>
-              <div class="mt-3 text-white/60 text-xs">共 ${state.expenses.length} 笔支出</div>
-
-              ${state.expenses.length > 0 ? `
-                <div class="mt-4 pt-4 border-t border-white/10 space-y-2">
-                  ${categoryStats.map(stat => `
-                    <div class="flex items-center justify-between text-xs">
-                      <div class="flex items-center gap-2">
-                        <div class="w-2 h-2 rounded-full" style="background-color: ${stat.color}; box-shadow: 0 0 8px ${stat.glowColor};"></div>
-                        <span class="text-white/80">${stat.name}</span>
-                      </div>
-                      <span class="text-white/90 font-medium">¥${stat.total.toFixed(2)}</span>
-                    </div>
-                  `).join('')}
-                </div>
-              ` : ''}
-            </div>
-          </div>
-
-          <!-- Content -->
-          <div class="flex-1 px-6 py-6">
-            ${state.view === 'form' ? renderForm() : state.view === 'voice' ? renderVoice() : renderList()}
-          </div>
-        </div>
-      `;
-
-      attachEventListeners();
-    }
-
-    function renderActivityRings(categoryStats, currentMonth) {
-      const foodStat = categoryStats.find(s => s.id === 'dining') || categoryStats[0];
-      const lifeStat = categoryStats.find(s => s.id === 'entertainment') || categoryStats[1];
-      const essentialStat = categoryStats.find(s => s.id === 'essential') || categoryStats[2];
-
-      return `
-        <div class="bg-white/30 backdrop-blur-md rounded-2xl p-5 border border-white/40 shadow-lg mb-6">
-          <div class="flex items-center justify-between mb-4">
-            <h3 class="font-semibold text-sm">支出分析</h3>
-            <span class="text-xs opacity-70">${currentMonth}</span>
-          </div>
-
-          <div class="relative w-40 h-40 mx-auto mb-5">
-            <svg class="absolute inset-0 -rotate-90" viewBox="0 0 160 160">
-              <circle cx="80" cy="80" r="70" fill="none" stroke="currentColor" stroke-width="12" class="opacity-10"/>
-              <circle cx="80" cy="80" r="70" fill="none" stroke="${essentialStat.color}" stroke-width="12" stroke-linecap="round" 
-                stroke-dasharray="${(439.6 * essentialStat.percentage) / 100} 439.6" 
-                style="filter: drop-shadow(0 0 6px ${essentialStat.glowColor})" class="activity-ring"/>
-            </svg>
-
-            <svg class="absolute inset-0 -rotate-90" viewBox="0 0 160 160">
-              <circle cx="80" cy="80" r="56" fill="none" stroke="currentColor" stroke-width="12" class="opacity-10"/>
-              <circle cx="80" cy="80" r="56" fill="none" stroke="${lifeStat.color}" stroke-width="12" stroke-linecap="round" 
-                stroke-dasharray="${(351.7 * lifeStat.percentage) / 100} 351.7" 
-                style="filter: drop-shadow(0 0 6px ${lifeStat.glowColor})" class="activity-ring"/>
-            </svg>
-
-            <svg class="absolute inset-0 -rotate-90" viewBox="0 0 160 160">
-              <circle cx="80" cy="80" r="42" fill="none" stroke="currentColor" stroke-width="12" class="opacity-10"/>
-              <circle cx="80" cy="80" r="42" fill="none" stroke="${foodStat.color}" stroke-width="12" stroke-linecap="round" 
-                stroke-dasharray="${(263.8 * foodStat.percentage) / 100} 263.8" 
-                style="filter: drop-shadow(0 0 6px ${foodStat.glowColor})" class="activity-ring"/>
-            </svg>
-
-            <div class="absolute inset-0 flex items-center justify-center">
-              <div class="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          <div class="space-y-2.5">
-            ${categoryStats.map(stat => `
-              <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                  <div class="w-3 h-3 rounded-full" style="background-color: ${stat.color}; box-shadow: 0 0 8px ${stat.glowColor};"></div>
-                  <span class="text-xs opacity-70">${stat.name}</span>
-                </div>
-                <span class="text-xs font-medium">¥${stat.total.toFixed(0)}</span>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      `;
-    }
-
-    function renderList() {
-      return `
-        <div class="flex items-center justify-between mb-6">
-          <h2 class="text-lg font-semibold text-slate-700">支出记录</h2>
-          <div class="relative">
-            <button onclick="toggleAddMenu()" class="flex items-center gap-2 px-5 py-2.5 bg-indigo-500 text-white rounded-xl font-medium hover:opacity-90 transition-opacity">
-              + 记一笔
-              <svg class="w-4 h-4 transition-transform ${state.showAddMenu ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-              </svg>
-            </button>
-
-            ${state.showAddMenu ? `
-              <div class="absolute right-0 top-full mt-2 w-40 bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden z-10">
-                <button onclick="showForm()" class="w-full px-4 py-3 text-left text-sm text-slate-700 hover:bg-slate-100 transition-colors">
-                  手动输入
-                </button>
-                <button onclick="showVoice()" class="w-full px-4 py-3 text-left text-sm text-slate-700 hover:bg-slate-100 transition-colors border-t border-slate-200">
-                  一口气说完
-                </button>
-              </div>
-            ` : ''}
-          </div>
-        </div>
-
-        ${state.expenses.length === 0 ? `
-          <div class="text-center py-16">
-            <div class="w-20 h-20 bg-slate-200 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <svg class="w-10 h-10 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
-              </svg>
-            </div>
-            <p class="text-slate-500 text-sm">还没有支出记录</p>
-            <p class="text-slate-400 text-xs mt-1">点击上方按钮开始记账</p>
-          </div>
-        ` : `
-          <div class="space-y-3">
-            ${state.expenses.map(expense => renderExpenseItem(expense)).join('')}
-          </div>
-        `}
-      `;
-    }
-
-    function renderExpenseItem(expense) {
-      const formatDate = (dateString) => {
-        const date = new Date(dateString);
-        const today = new Date();
-        const yesterday = new Date(today);
-        yesterday.setDate(yesterday.getDate() - 1);
-
-        if (date.toDateString() === today.toDateString()) return '今天';
-        if (date.toDateString() === yesterday.toDateString()) return '昨天';
-        return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+        setParsedExpenses(expenses);
       };
 
-      const offset = state.swipeState.swipedId === expense.id && state.swipeState.isDragging ? state.swipeState.currentX : 0;
+      const startListening = () => {
+        if (recognitionRef.current) {
+          setTranscript("");
+          setParsedExpenses([]);
+          recognitionRef.current.start();
+          setIsListening(true);
+        }
+      };
 
-      return `
-        <div class="relative overflow-hidden">
-          <div class="absolute inset-0 bg-gradient-to-l from-red-500/20 to-transparent rounded-2xl flex items-center justify-end pr-6">
-            <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-            </svg>
-          </div>
+      const stopListening = () => {
+        if (recognitionRef.current) {
+          recognitionRef.current.stop();
+          setIsListening(false);
+        }
+      };
 
-          <div 
-            class="bg-white rounded-2xl p-4 border border-slate-200 hover:shadow-sm transition-all relative cursor-pointer"
-            style="transform: translateX(-${offset}px); transition: ${state.swipeState.isDragging ? 'none' : 'transform 0.3s ease-out'};"
-            data-expense-id="${expense.id}"
-            ontouchstart="handleTouchStart(event, '${expense.id}')"
-            ontouchmove="handleTouchMove(event)"
-            ontouchend="handleTouchEnd('${expense.id}')"
-          >
-            <div class="flex items-center gap-4">
-              <div class="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                <span class="text-2xl">${expense.icon}</span>
-              </div>
+      const handleSubmit = () => {
+        if (parsedExpenses.length > 0) {
+          onSubmit(parsedExpenses);
+        }
+      };
 
-              <div class="flex-1 min-w-0">
-                <div class="flex items-start justify-between gap-2 mb-1">
-                  <h4 class="font-medium text-slate-700 truncate">${expense.description}</h4>
-                  <span class="text-lg font-semibold text-slate-700 whitespace-nowrap">¥${expense.amount.toFixed(2)}</span>
-                </div>
-                <div class="flex items-center justify-between gap-2">
-                  <span class="text-xs text-slate-500">${expense.category}</span>
-                  <span class="text-xs text-slate-500">${formatDate(expense.date)}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
-    }
-
-    function renderForm() {
-      const suggestedCategory = state.formData.description && !state.formData.category 
-        ? matchCategory(state.formData.description) 
-        : null;
-
-      return `
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div class="flex items-center justify-between px-5 py-4 border-b border-slate-200">
-            <h3 class="font-semibold text-slate-700">添加支出</h3>
-            <button onclick="cancelForm()" class="text-slate-400 hover:text-slate-600">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-              </svg>
+      return (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-semibold">一口气说完</h2>
+            <button onClick={onCancel} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+              <X />
             </button>
           </div>
 
-          <form onsubmit="submitForm(event)" class="p-5 space-y-5">
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-2">金额</label>
-              <div class="relative">
-                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-lg">¥</span>
-                <input type="number" step="0.01" value="${state.formData.amount}" oninput="updateFormAmount(this.value)" 
-                  placeholder="0.00" required
-                  class="w-full pl-10 pr-4 py-3 bg-slate-100 rounded-xl border-0 text-lg font-semibold text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"/>
-              </div>
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-2">
-                描述
-                ${suggestedCategory ? `<span class="text-indigo-500 text-xs ml-2">💡 为你推荐：${suggestedCategory}</span>` : ''}
-              </label>
-              <input type="text" value="${state.formData.description}" oninput="updateFormDescription(this.value)" 
-                placeholder="今天买了什么？" required
-                class="w-full px-4 py-3 bg-slate-100 rounded-xl border-0 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"/>
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-3">选择类目</label>
-              <div class="grid grid-cols-4 gap-3">
-                ${EXPENSE_CATEGORIES.map(category => {
-                  const isSelected = state.formData.category === category.name || (!state.formData.category && suggestedCategory === category.name);
-                  return `
-                    <button type="button" onclick="selectCategory('${category.name}')"
-                      class="flex flex-col items-center gap-2 p-3 rounded-xl transition-all duration-300 ${
-                        isSelected 
-                          ? 'bg-indigo-500 text-white shadow-sm scale-110 animate-bubble' 
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200 hover:scale-105'
-                      }">
-                      <span class="text-2xl">${category.icon}</span>
-                      <span class="text-xs font-medium">${category.name}</span>
-                    </button>
-                  `;
-                }).join('')}
-              </div>
-            </div>
-
-            <button type="submit" class="w-full py-3.5 bg-indigo-500 text-white rounded-xl font-semibold hover:opacity-90 transition-opacity">
-              添加记录
+          <div className="flex flex-col items-center gap-6 mb-6">
+            <button
+              onClick={isListening ? stopListening : startListening}
+              className={`w-24 h-24 rounded-full flex items-center justify-center transition-all ${
+                isListening
+                  ? "bg-red-500 text-white animate-pulse"
+                  : "bg-blue-500 text-white hover:bg-blue-600"
+              }`}
+            >
+              {isListening ? <MicOff /> : <Mic />}
             </button>
-          </form>
-        </div>
-      `;
-    }
-
-    function renderVoice() {
-      return `
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div class="flex items-center justify-between px-5 py-4 border-b border-slate-200">
-            <h3 class="font-semibold text-slate-700">一口气说完</h3>
-            <button onclick="cancelVoice()" class="text-slate-400 hover:text-slate-600">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-              </svg>
-            </button>
+            <p className="text-sm text-gray-600 text-center">
+              {isListening ? "正在录音..." : "点击麦克风开始说话"}
+            </p>
           </div>
 
-          <div class="p-5 space-y-5">
-            <div class="flex flex-col items-center gap-4">
-              <button onclick="toggleListening()" class="w-24 h-24 rounded-full flex items-center justify-center transition-all ${
-                state.voiceData.isListening 
-                  ? 'bg-red-500 text-white animate-pulse shadow-lg' 
-                  : 'bg-indigo-500 text-white hover:opacity-90'
-              }">
-                ${state.voiceData.isListening ? `
-                  <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
-                  </svg>
-                ` : `
-                  <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
-                  </svg>
-                `}
-              </button>
-              <p class="text-sm text-slate-500 text-center">
-                ${state.voiceData.isListening ? '正在聆听...说完后点击停止' : '点击麦克风开始语音录入'}
-              </p>
-              <p class="text-xs text-slate-400 text-center px-4">示例：早餐20元，午餐35块，打车15元</p>
+          {transcript && (
+            <div className="mb-4 p-4 bg-gray-50 rounded-xl">
+              <p className="text-sm text-gray-600 mb-1">识别内容：</p>
+              <p className="text-sm">{transcript}</p>
             </div>
+          )}
 
-            ${state.voiceData.transcript ? `
-              <div class="bg-slate-100 rounded-xl p-4">
-                <p class="text-sm text-slate-700">${state.voiceData.transcript}</p>
-              </div>
-            ` : ''}
-
-            ${state.voiceData.parsedExpenses.length > 0 ? `
-              <div class="space-y-3">
-                <h4 class="text-sm font-medium text-slate-700">识别到 ${state.voiceData.parsedExpenses.length} 笔支出：</h4>
-                ${state.voiceData.parsedExpenses.map((expense, index) => `
-                  <div class="flex items-center justify-between bg-slate-100 rounded-xl p-3">
-                    <div class="flex-1">
-                      <p class="text-sm font-medium text-slate-700">${expense.description}</p>
-                      <p class="text-xs text-slate-500 mt-1">¥${expense.amount.toFixed(2)} · ${expense.category}</p>
+          {parsedExpenses.length > 0 && (
+            <div className="space-y-3 mb-6">
+              <p className="text-sm font-medium text-gray-700">识别到的支出：</p>
+              {parsedExpenses.map((expense, index) => {
+                const category = EXPENSE_CATEGORIES.find(c => c.name === expense.category);
+                return (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-xl"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{category?.icon || "📦"}</span>
+                      <div>
+                        <p className="text-sm font-medium">{expense.description}</p>
+                        <p className="text-xs text-gray-500">{expense.category}</p>
+                      </div>
                     </div>
-                    <button onclick="removeVoiceExpense(${index})" class="text-slate-400 hover:text-red-500 ml-2">
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                      </svg>
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium">¥{expense.amount}</span>
+                      <button
+                        onClick={() => setParsedExpenses(parsedExpenses.filter((_, i) => i !== index))}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <X />
+                      </button>
+                    </div>
                   </div>
-                `).join('')}
+                );
+              })}
+            </div>
+          )}
 
-                <button onclick="submitVoice()" class="w-full py-3.5 bg-indigo-500 text-white rounded-xl font-semibold hover:opacity-90 transition-opacity">
-                  确认记录（${state.voiceData.parsedExpenses.length} 笔）
-                </button>
+          {parsedExpenses.length > 0 && (
+            <button
+              onClick={handleSubmit}
+              className="w-full py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition-colors"
+            >
+              确认记录
+            </button>
+          )}
+        </div>
+      );
+    }
+
+    // 主应用
+    function ExpenseTracker() {
+      const [expenses, setExpenses] = useState(() => {
+        const saved = localStorage.getItem("expense-tracker-data");
+        return saved ? JSON.parse(saved) : [];
+      });
+      const [showForm, setShowForm] = useState(false);
+      const [showVoiceInput, setShowVoiceInput] = useState(false);
+      const [showRings, setShowRings] = useState(false);
+      const [showAddMenu, setShowAddMenu] = useState(false);
+      const [formData, setFormData] = useState({
+        amount: "",
+        description: "",
+        category: "",
+      });
+
+      useEffect(() => {
+        localStorage.setItem("expense-tracker-data", JSON.stringify(expenses));
+      }, [expenses]);
+
+      const addExpense = (e) => {
+        e.preventDefault();
+        const category = EXPENSE_CATEGORIES.find(c => c.name === formData.category) || EXPENSE_CATEGORIES[EXPENSE_CATEGORIES.length - 1];
+        const newExpense = {
+          id: Date.now().toString(),
+          amount: parseFloat(formData.amount),
+          category: formData.category,
+          description: formData.description,
+          date: new Date().toISOString(),
+          icon: category.icon,
+        };
+        setExpenses([newExpense, ...expenses]);
+        setFormData({ amount: "", description: "", category: "" });
+        setShowForm(false);
+      };
+
+      const addBatchExpenses = (batchExpenses) => {
+        const newExpenses = batchExpenses.map((expense, index) => {
+          const categoryData = EXPENSE_CATEGORIES.find(c => c.name === expense.category) || EXPENSE_CATEGORIES[EXPENSE_CATEGORIES.length - 1];
+          return {
+            id: (Date.now() + index).toString(),
+            amount: expense.amount,
+            category: expense.category,
+            description: expense.description,
+            date: new Date().toISOString(),
+            icon: categoryData.icon,
+          };
+        });
+        setExpenses([...newExpenses, ...expenses]);
+        setShowVoiceInput(false);
+      };
+
+      const deleteExpense = (id) => {
+        setExpenses(expenses.filter(e => e.id !== id));
+      };
+
+      const totalExpense = expenses.reduce((sum, e) => sum + e.amount, 0);
+
+      const groupStats = {};
+      CATEGORY_GROUPS.forEach(group => {
+        groupStats[group.id] = 0;
+      });
+      expenses.forEach(expense => {
+        const category = EXPENSE_CATEGORIES.find(c => c.name === expense.category);
+        if (category) {
+          groupStats[category.group] += expense.amount;
+        }
+      });
+
+      useEffect(() => {
+        if (formData.description) {
+          const matched = matchCategory(formData.description);
+          if (matched && !formData.category) {
+            setFormData(prev => ({ ...prev, category: matched }));
+          }
+        }
+      }, [formData.description]);
+
+      return (
+        <div className="mx-auto max-w-md min-h-screen flex flex-col" style={{ backgroundColor: "var(--background)" }}>
+          {/* Header */}
+          <div style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }} className="px-6 py-8 rounded-b-[2rem]">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                  <Wallet />
+                </div>
+                <h1 className="text-xl font-semibold">记账本</h1>
               </div>
-            ` : ''}
+              <button
+                onClick={() => setShowRings(!showRings)}
+                className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm hover:bg-white/20 transition-colors"
+              >
+                <Calendar />
+              </button>
+            </div>
+
+            {showRings && (
+              <div className="mb-6">
+                <ActivityRings expenses={expenses} />
+              </div>
+            )}
+
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-sm text-white/80">本月支出</span>
+                <span className="text-xs text-white/60">{expenses.length} 笔</span>
+              </div>
+              <div className="text-3xl font-bold mb-4">¥{totalExpense.toFixed(2)}</div>
+              <div className="space-y-2">
+                {CATEGORY_GROUPS.map(group => (
+                  <div key={group.id} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-2 h-2 rounded-full"
+                        style={{
+                          backgroundColor: group.color,
+                          boxShadow: `0 0 6px ${group.glowColor}`,
+                        }}
+                      />
+                      <span className="text-xs text-white/80">{group.name}</span>
+                    </div>
+                    <span className="text-xs font-medium text-white/90">¥{groupStats[group.id].toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 px-6 py-6">
+            {showForm ? (
+              <div className="bg-white rounded-2xl shadow-sm border p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-lg font-semibold">添加支出</h2>
+                  <button onClick={() => setShowForm(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+                    <X />
+                  </button>
+                </div>
+                <form onSubmit={addExpense} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">金额</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formData.amount}
+                      onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                      className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="0.00"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">描述</label>
+                    <input
+                      type="text"
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="例如：买菜、打车"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">类目</label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {EXPENSE_CATEGORIES.map(category => (
+                        <button
+                          key={category.name}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, category: category.name })}
+                          className={`p-3 rounded-xl border-2 transition-all ${
+                            formData.category === category.name
+                              ? "border-blue-500 bg-blue-50 animate-bubble"
+                              : "border-gray-200 hover:border-blue-300 hover:scale-105"
+                          }`}
+                        >
+                          <div className="text-2xl mb-1">{category.icon}</div>
+                          <div className="text-xs">{category.name}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600"
+                  >
+                    添加
+                  </button>
+                </form>
+              </div>
+            ) : showVoiceInput ? (
+              <VoiceInput onSubmit={addBatchExpenses} onCancel={() => setShowVoiceInput(false)} />
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-lg font-semibold">支出记录</h2>
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowAddMenu(!showAddMenu)}
+                      style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium hover:opacity-90"
+                    >
+                      + 记一笔
+                      <ChevronDown className={`w-4 h-4 transition-transform ${showAddMenu ? "rotate-180" : ""}`} />
+                    </button>
+                    {showAddMenu && (
+                      <div className="absolute right-0 top-full mt-2 w-40 bg-white rounded-xl shadow-lg border overflow-hidden z-10">
+                        <button
+                          onClick={() => { setShowForm(true); setShowAddMenu(false); }}
+                          className="w-full px-4 py-3 text-left text-sm hover:bg-gray-100"
+                        >
+                          手动输入
+                        </button>
+                        <button
+                          onClick={() => { setShowVoiceInput(true); setShowAddMenu(false); }}
+                          className="w-full px-4 py-3 text-left text-sm hover:bg-gray-100 border-t"
+                        >
+                          一口气说完
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {expenses.length === 0 ? (
+                  <div className="text-center py-16">
+                    <div className="w-20 h-20 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                      <Wallet />
+                    </div>
+                    <p className="text-gray-500 text-sm">还没有支出记录</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {expenses.map(expense => (
+                      <div key={expense.id} className="bg-white rounded-xl p-4 shadow-sm border flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">{expense.icon}</span>
+                          <div>
+                            <p className="font-medium">{expense.description}</p>
+                            <p className="text-xs text-gray-500">{expense.category}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="font-medium">¥{expense.amount.toFixed(2)}</span>
+                          <button
+                            onClick={() => deleteExpense(expense.id)}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <X />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
-      `;
+      );
     }
 
-    function attachEventListeners() {
-      // Touch events are handled inline via ontouchstart/move/end attributes
-    }
-
-    // ======= 全局函数 =======
-    window.toggleRings = () => {
-      state.showRings = !state.showRings;
-      render();
-    };
-
-    window.toggleAddMenu = () => {
-      state.showAddMenu = !state.showAddMenu;
-      render();
-    };
-
-    window.showForm = () => {
-      state.view = 'form';
-      state.showAddMenu = false;
-      state.formData = { amount: '', description: '', category: '' };
-      render();
-    };
-
-    window.showVoice = () => {
-      state.view = 'voice';
-      state.showAddMenu = false;
-      state.voiceData = { isListening: false, transcript: '', parsedExpenses: [] };
-      render();
-    };
-
-    window.cancelForm = () => {
-      state.view = 'list';
-      render();
-    };
-
-    window.cancelVoice = () => {
-      if (state.voiceData.isListening && recognition) {
-        recognition.stop();
-      }
-      state.view = 'list';
-      render();
-    };
-
-    window.updateFormAmount = (value) => {
-      state.formData.amount = value;
-    };
-
-    window.updateFormDescription = (value) => {
-      state.formData.description = value;
-      render();
-    };
-
-    window.selectCategory = (category) => {
-      state.formData.category = category;
-      render();
-    };
-
-    window.submitForm = (event) => {
-      event.preventDefault();
-      const finalCategory = state.formData.category || matchCategory(state.formData.description) || '其他';
-      const categoryData = EXPENSE_CATEGORIES.find(c => c.name === finalCategory) || EXPENSE_CATEGORIES[EXPENSE_CATEGORIES.length - 1];
-
-      addExpense({
-        amount: parseFloat(state.formData.amount),
-        category: finalCategory,
-        description: state.formData.description,
-        date: new Date().toISOString(),
-        icon: categoryData.icon,
-      });
-    };
-
-    window.submitVoice = () => {
-      addBatchExpenses(state.voiceData.parsedExpenses);
-    };
-
-    window.removeVoiceExpense = (index) => {
-      state.voiceData.parsedExpenses.splice(index, 1);
-      render();
-    };
-
-    window.handleTouchStart = (e, id) => {
-      state.swipeState.startX = e.touches[0].clientX;
-      state.swipeState.swipedId = id;
-      state.swipeState.isDragging = true;
-      render();
-    };
-
-    window.handleTouchMove = (e) => {
-      if (!state.swipeState.isDragging) return;
-      const deltaX = state.swipeState.startX - e.touches[0].clientX;
-      if (deltaX > 0) {
-        state.swipeState.currentX = Math.min(deltaX, 80);
-        render();
-      }
-    };
-
-    window.handleTouchEnd = (id) => {
-      state.swipeState.isDragging = false;
-      if (state.swipeState.currentX > 60) {
-        deleteExpense(id);
-      }
-      state.swipeState.currentX = 0;
-      state.swipeState.startX = 0;
-      render();
-    };
-
-    // ======= 初始化 =======
-    initSpeechRecognition();
-    render();
+    ReactDOM.render(<ExpenseTracker />, document.getElementById('root'));
   </script>
 </body>
 </html>
